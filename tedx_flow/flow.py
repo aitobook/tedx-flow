@@ -8,7 +8,7 @@ support for parallel execution, streaming, and dynamic task scheduling.
 import logging
 import traceback
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from inspect import signature
 from queue import Queue
@@ -81,7 +81,7 @@ class Task:
     """Internal task representation."""
 
     id: str
-    action: Callable[[Context], TaskOutput]
+    action: Callable[..., TaskOutput]
 
 
 @dataclass
@@ -151,7 +151,7 @@ class Flow:
         self.output_ids_lock = Lock()
         self.logger = logging.getLogger(__name__)
 
-    def add_task(self, name: str, action: Callable[[Context], TaskOutput]):
+    def add_task(self, name: str, action: Callable[..., TaskOutput]):
         """
         Register a task with the flow.
 
@@ -165,7 +165,7 @@ class Flow:
 
     def execute_task(
         self,
-        action: Callable[[Context], TaskOutput],
+        action: Callable[..., TaskOutput],
         task: NextTask,
         task_queue: Queue,
         stream_queue: Optional[Queue] = None,
@@ -184,10 +184,11 @@ class Flow:
         try:
             # Check if action accepts inputs parameter
             sig = signature(action)
+            result: TaskOutput
             if "inputs" in sig.parameters:
-                result: TaskOutput = action(self.context, inputs=task.inputs)
+                result = action(self.context, inputs=task.inputs)
             else:
-                result: TaskOutput = action(self.context)
+                result = action(self.context)
 
             # Set state to the output of the task
             self.context.set(task.id, result.output)
@@ -257,7 +258,7 @@ class Flow:
         self.logger.info(f"Starting flow run with initial task: {start_task_id}")
 
         task_queue: Queue = Queue()
-        futures = set()
+        futures: set[Future[None]] = set()
 
         self.active_tasks.add(start_task_id)
         task_queue.put(NextTask(start_task_id, inputs))
@@ -310,7 +311,7 @@ class Flow:
         """
         task_queue: Queue = Queue()
         stream_queue: Queue = Queue()
-        futures = set()
+        futures: set[Future[None]] = set()
 
         self.active_tasks.add(start_task_id)
         task_queue.put(NextTask(start_task_id, inputs))
