@@ -32,17 +32,18 @@ class NextTask:
         id: The unique identifier of the next task
         inputs: Dictionary of inputs to pass to the next task
         spawn_another: If True, allows parallel execution of same task
-    
+
     Example:
         # Simple next task
         NextTask("process_data")
-        
+
         # With inputs
         NextTask("process_data", inputs={"batch_size": 100})
-        
+
         # Allow parallel instances
         NextTask("process_data", spawn_another=True)
     """
+
     id: str
     inputs: Optional[Dict[str, Any]] = None
     spawn_another: bool = False
@@ -56,20 +57,21 @@ class TaskOutput:
     Attributes:
         output: The result value from the task
         next_tasks: List of tasks to schedule next (None = terminal task)
-    
+
     Example:
         # Terminal task (no next tasks)
         TaskOutput(output="done")
-        
+
         # Chain to next task
         TaskOutput(output=result, next_tasks=[NextTask("next_step")])
-        
+
         # Fan out to multiple tasks
         TaskOutput(output=result, next_tasks=[
             NextTask("branch_a"),
             NextTask("branch_b")
         ])
     """
+
     output: Any
     next_tasks: Optional[List[NextTask]] = None
 
@@ -77,6 +79,7 @@ class TaskOutput:
 @dataclass
 class Task:
     """Internal task representation."""
+
     id: str
     action: Callable[[Context], TaskOutput]
 
@@ -90,6 +93,7 @@ class StreamChunk:
         task_id: The ID of the task that produced this chunk
         value: The output value
     """
+
     task_id: str
     value: Any
 
@@ -97,33 +101,33 @@ class StreamChunk:
 class Flow:
     """
     Task flow orchestration engine.
-    
+
     Flow manages the execution of interconnected tasks, handling:
     - Parallel task execution via ThreadPoolExecutor
     - Task dependencies through Context
     - Dynamic task scheduling based on TaskOutput.next_tasks
     - Streaming output for real-time results
     - Error propagation and cleanup
-    
+
     Example:
         from concurrent.futures import ThreadPoolExecutor
-        
+
         def fetch_data(ctx: Context) -> TaskOutput:
             data = fetch_from_api()
             return TaskOutput(output=data, next_tasks=[NextTask("process")])
-        
+
         def process(ctx: Context) -> TaskOutput:
             data = ctx.get("fetch_data")
             result = transform(data)
             return TaskOutput(output=result)
-        
+
         with ThreadPoolExecutor(max_workers=4) as executor:
             flow = Flow(executor)
             flow.add_task("fetch_data", fetch_data)
             flow.add_task("process", process)
             results = flow.run("fetch_data")
     """
-    
+
     def __init__(
         self,
         thread_pool_executor: ThreadPoolExecutor,
@@ -131,7 +135,7 @@ class Flow:
     ):
         """
         Initialize a Flow instance.
-        
+
         Args:
             thread_pool_executor: Executor for parallel task execution
             context: Optional pre-configured context (creates new if None)
@@ -150,7 +154,7 @@ class Flow:
     def add_task(self, name: str, action: Callable[[Context], TaskOutput]):
         """
         Register a task with the flow.
-        
+
         Args:
             name: Unique task identifier
             action: Task function that takes Context and returns TaskOutput
@@ -164,11 +168,11 @@ class Flow:
         action: Callable[[Context], TaskOutput],
         task: NextTask,
         task_queue: Queue,
-        stream_queue: Optional[Queue] = None
+        stream_queue: Optional[Queue] = None,
     ):
         """
         Execute a single task.
-        
+
         Args:
             action: The task function to execute
             task: NextTask containing task ID and inputs
@@ -226,39 +230,35 @@ class Flow:
                             raise Exception(f"Task {next_task.id} not found")
 
         except Exception as e:
-            self.context.set(
-                __ERROR__, {"error": str(e), "traceback": traceback.format_exc()}
-            )
+            self.context.set(__ERROR__, {"error": str(e), "traceback": traceback.format_exc()})
             with self.active_tasks_lock:
                 self.active_tasks.clear()
 
             task_queue.put(NextTask(__ERROR__, None))
             raise e
 
-    def run(
-        self, start_task_id: str, inputs: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def run(self, start_task_id: str, inputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Execute the flow starting from a specific task.
-        
+
         This method blocks until all tasks complete and returns
         the outputs of all terminal tasks (tasks with no next_tasks).
-        
+
         Args:
             start_task_id: ID of the task to start execution from
             inputs: Optional initial inputs to set in context
-            
+
         Returns:
             Dictionary mapping output task IDs to their output values
-            
+
         Raises:
             Exception: If any task fails during execution
         """
         self.logger.info(f"Starting flow run with initial task: {start_task_id}")
-        
+
         task_queue: Queue = Queue()
         futures = set()
-        
+
         self.active_tasks.add(start_task_id)
         task_queue.put(NextTask(start_task_id, inputs))
 
@@ -286,9 +286,7 @@ class Flow:
 
             action = self.tasks[next_task.id.split(__HASH_SPLIT__)[0]].action
 
-            future = self._executor.submit(
-                self.execute_task, action, next_task, task_queue
-            )
+            future = self._executor.submit(self.execute_task, action, next_task, task_queue)
             futures.add(future)
 
         # Return values of the output nodes
@@ -299,14 +297,14 @@ class Flow:
     ) -> Generator[StreamChunk, None, None]:
         """
         Execute the flow with streaming output.
-        
+
         Yields StreamChunk objects as each task completes, allowing
         real-time processing of intermediate results.
-        
+
         Args:
             start_task_id: ID of the task to start execution from
             inputs: Optional initial inputs to set in context
-            
+
         Yields:
             StreamChunk objects containing task_id and output value
         """
@@ -359,7 +357,7 @@ class Flow:
     def get_context(self) -> Context:
         """
         Get the flow's context.
-        
+
         Returns:
             The Context instance used by this flow
         """
@@ -368,23 +366,23 @@ class Flow:
     def reset(self, keep_tasks: bool = True):
         """
         Reset flow state for reuse with a new execution.
-        
+
         This method clears runtime state while optionally preserving
         registered task definitions. Call this BEFORE starting a new
         flow.run() to avoid state pollution between executions.
-        
+
         WARNING: Do NOT call this during an active flow execution,
         as it will corrupt the state of running tasks.
-        
+
         Thread Safety:
         - Safe to call when no tasks are running
         - NOT safe to call during active flow execution
         - Does NOT affect other Flow instances or other processes
-        
+
         Args:
-            keep_tasks: If True (default), preserve registered task 
+            keep_tasks: If True (default), preserve registered task
                        definitions. If False, also clear task registry.
-        
+
         Example:
             flow.reset()  # Clear state, keep task definitions
             flow.context.set("qid", new_qid)
@@ -392,13 +390,13 @@ class Flow:
         """
         with self.active_tasks_lock:
             self.active_tasks.clear()
-        
+
         with self.output_ids_lock:
             self.output_task_ids.clear()
-        
+
         # Clear context states (task outputs and user-set values)
         self.context.states.clear()
-        
+
         # Optionally clear task definitions
         if not keep_tasks:
             self.tasks.clear()
@@ -406,5 +404,5 @@ class Flow:
             # Re-register empty states for existing tasks
             for task_name in self.tasks:
                 self.context.set_state(task_name, State.empty())
-        
+
         self.logger.info("Flow state reset")

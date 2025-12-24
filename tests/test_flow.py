@@ -7,6 +7,7 @@ import pytest
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tedx_flow import Context, Flow, NextTask, StreamChunk, TaskOutput
@@ -45,6 +46,7 @@ class TestFlow:
 
     def test_simple_flow(self):
         """Test a simple two-task flow."""
+
         def task_a(ctx: Context) -> TaskOutput:
             return TaskOutput(output="hello", next_tasks=[NextTask("task_b")])
 
@@ -62,6 +64,7 @@ class TestFlow:
 
     def test_flow_with_inputs(self):
         """Test flow with initial inputs."""
+
         def task_a(ctx: Context, inputs: dict = None) -> TaskOutput:
             name = inputs.get("name", "unknown") if inputs else "unknown"
             return TaskOutput(output=f"Hello, {name}!")
@@ -79,10 +82,7 @@ class TestFlow:
 
         def task_start(ctx: Context) -> TaskOutput:
             execution_order.append("start")
-            return TaskOutput(
-                output="started",
-                next_tasks=[NextTask("task_a"), NextTask("task_b")]
-            )
+            return TaskOutput(output="started", next_tasks=[NextTask("task_a"), NextTask("task_b")])
 
         def task_a(ctx: Context) -> TaskOutput:
             time.sleep(0.1)
@@ -107,6 +107,7 @@ class TestFlow:
 
     def test_streaming(self):
         """Test streaming output."""
+
         def task_a(ctx: Context) -> TaskOutput:
             return TaskOutput(output="first", next_tasks=[NextTask("task_b")])
 
@@ -135,7 +136,7 @@ class TestFlow:
                 next_tasks=[
                     NextTask("worker", inputs={"id": 1}, spawn_another=True),
                     NextTask("worker", inputs={"id": 2}, spawn_another=True),
-                ]
+                ],
             )
 
         def worker(ctx: Context, inputs: dict = None) -> TaskOutput:
@@ -153,6 +154,7 @@ class TestFlow:
 
     def test_error_handling(self):
         """Test error propagation."""
+
         def failing_task(ctx: Context) -> TaskOutput:
             raise ValueError("Task failed!")
 
@@ -174,30 +176,32 @@ class TestFlow:
 
     def test_reset_clears_state(self):
         """Test reset clears runtime state but keeps task definitions."""
+
         def task_a(ctx: Context) -> TaskOutput:
             return TaskOutput(output="result_a")
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             flow = Flow(executor)
             flow.add_task("task_a", task_a)
-            
+
             # First run
             result1 = flow.run("task_a")
             assert result1 == {"task_a": "result_a"}
             assert len(flow.output_task_ids) == 1
-            
+
             # Reset and run again
             flow.reset(keep_tasks=True)
             assert len(flow.output_task_ids) == 0
             assert len(flow.active_tasks) == 0
             assert "task_a" in flow.tasks  # Task definition preserved
-            
+
             # Second run should work
             result2 = flow.run("task_a")
             assert result2 == {"task_a": "result_a"}
 
     def test_reset_clears_tasks(self):
         """Test reset with keep_tasks=False clears task definitions."""
+
         def task_a(ctx: Context) -> TaskOutput:
             return TaskOutput(output="result")
 
@@ -205,7 +209,7 @@ class TestFlow:
             flow = Flow(executor)
             flow.add_task("task_a", task_a)
             flow.run("task_a")
-            
+
             flow.reset(keep_tasks=False)
             assert len(flow.tasks) == 0
 
@@ -237,10 +241,7 @@ class TestTaskOutput:
         assert output.next_tasks is None
 
     def test_with_next_tasks(self):
-        output = TaskOutput(
-            output="result",
-            next_tasks=[NextTask("next")]
-        )
+        output = TaskOutput(output="result", next_tasks=[NextTask("next")])
         assert len(output.next_tasks) == 1
         assert output.next_tasks[0].id == "next"
 

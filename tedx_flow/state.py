@@ -12,16 +12,16 @@ from typing import Any, Optional
 class State:
     """
     Thread-safe state container with semaphore-based synchronization.
-    
+
     Used internally by Context to manage task outputs and coordinate
     dependencies between tasks.
-    
+
     Attributes:
         _value: The stored value
         semaphore: Controls access to value (blocks until value is set)
         _lock: Thread lock for safe value updates
     """
-    
+
     def __init__(self, value: Optional[Any] = None):
         self._value = value
         self.semaphore = Semaphore(0)
@@ -30,10 +30,10 @@ class State:
     def get_value(self) -> Optional[Any]:
         """
         Get the value, blocking until it's available.
-        
+
         This method will block if the value hasn't been set yet,
         making it useful for task dependency coordination.
-        
+
         Returns:
             The stored value
         """
@@ -45,10 +45,10 @@ class State:
     def get_value_with_lock(self) -> Optional[Any]:
         """
         Get the value immediately with lock protection.
-        
+
         Unlike get_value(), this doesn't block waiting for the value.
         Use this for inspection/debugging purposes.
-        
+
         Returns:
             The stored value (may be None if not yet set)
         """
@@ -58,7 +58,7 @@ class State:
     def set_value(self, value: Optional[Any]):
         """
         Set the value and release waiting consumers.
-        
+
         Args:
             value: The value to store
         """
