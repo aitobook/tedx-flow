@@ -31,7 +31,7 @@ Features:
     - Parallel Execution: Concurrent independent tasks
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Your Name"
 
 from .context import Context

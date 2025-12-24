@@ -172,6 +172,43 @@ class TestFlow:
 
             assert flow.get_context().get("initial") == "value"
 
+    def test_reset_clears_state(self):
+        """Test reset clears runtime state but keeps task definitions."""
+        def task_a(ctx: Context) -> TaskOutput:
+            return TaskOutput(output="result_a")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            flow = Flow(executor)
+            flow.add_task("task_a", task_a)
+            
+            # First run
+            result1 = flow.run("task_a")
+            assert result1 == {"task_a": "result_a"}
+            assert len(flow.output_task_ids) == 1
+            
+            # Reset and run again
+            flow.reset(keep_tasks=True)
+            assert len(flow.output_task_ids) == 0
+            assert len(flow.active_tasks) == 0
+            assert "task_a" in flow.tasks  # Task definition preserved
+            
+            # Second run should work
+            result2 = flow.run("task_a")
+            assert result2 == {"task_a": "result_a"}
+
+    def test_reset_clears_tasks(self):
+        """Test reset with keep_tasks=False clears task definitions."""
+        def task_a(ctx: Context) -> TaskOutput:
+            return TaskOutput(output="result")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            flow = Flow(executor)
+            flow.add_task("task_a", task_a)
+            flow.run("task_a")
+            
+            flow.reset(keep_tasks=False)
+            assert len(flow.tasks) == 0
+
 
 class TestNextTask:
     """Tests for NextTask dataclass."""

@@ -364,3 +364,47 @@ class Flow:
             The Context instance used by this flow
         """
         return self.context
+
+    def reset(self, keep_tasks: bool = True):
+        """
+        Reset flow state for reuse with a new execution.
+        
+        This method clears runtime state while optionally preserving
+        registered task definitions. Call this BEFORE starting a new
+        flow.run() to avoid state pollution between executions.
+        
+        WARNING: Do NOT call this during an active flow execution,
+        as it will corrupt the state of running tasks.
+        
+        Thread Safety:
+        - Safe to call when no tasks are running
+        - NOT safe to call during active flow execution
+        - Does NOT affect other Flow instances or other processes
+        
+        Args:
+            keep_tasks: If True (default), preserve registered task 
+                       definitions. If False, also clear task registry.
+        
+        Example:
+            flow.reset()  # Clear state, keep task definitions
+            flow.context.set("qid", new_qid)
+            flow.run("start_task")
+        """
+        with self.active_tasks_lock:
+            self.active_tasks.clear()
+        
+        with self.output_ids_lock:
+            self.output_task_ids.clear()
+        
+        # Clear context states (task outputs and user-set values)
+        self.context.states.clear()
+        
+        # Optionally clear task definitions
+        if not keep_tasks:
+            self.tasks.clear()
+        else:
+            # Re-register empty states for existing tasks
+            for task_name in self.tasks:
+                self.context.set_state(task_name, State.empty())
+        
+        self.logger.info("Flow state reset")
