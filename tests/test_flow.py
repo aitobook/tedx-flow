@@ -1,12 +1,11 @@
 """Tests for tedx_flow."""
 
+import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-
-import sys
-import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
